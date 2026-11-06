@@ -1,0 +1,16 @@
+# Referenced by the multi-source cert-manager Application — Git stays the
+# single source of truth even for cluster-scoped platform objects.
+apiVersion: cert-manager.io/v1
+kind: ClusterIssuer
+metadata:
+  name: letsencrypt-prod
+spec:
+  acme:
+    server: https://acme-v02.api.letsencrypt.org/directory
+    email: <your-email@example.com>   # replace with your ACME contact
+    privateKeySecretRef:
+      name: letsencrypt-prod-account-key
+    solvers:
+      - http01:
+          ingress:
+            ingressClassName: nginx

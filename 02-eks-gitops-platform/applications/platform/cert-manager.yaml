@@ -1,0 +1,32 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: cert-manager
+  namespace: argocd
+spec:
+  project: platform
+  sources:
+    - repoURL: https://charts.jetstack.io
+      chart: cert-manager
+      targetRevision: v1.15.3
+      helm:
+        values: |
+          crds:
+            enabled: true
+          resources:
+            requests:
+              cpu: 50m
+              memory: 64Mi
+    # ClusterIssuer lives in our own repo — Git stays the single source of truth.
+    - repoURL: https://github.com/shahbazkareem/eks-gitops-platform
+      targetRevision: main
+      path: applications/platform/cert-manager-extras
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: cert-manager
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true

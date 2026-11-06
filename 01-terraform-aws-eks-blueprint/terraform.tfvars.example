@@ -1,0 +1,30 @@
+# Copy to terraform.tfvars (gitignored) and adjust.
+# terraform.tfvars.example is committed; real tfvars never are.
+
+aws_region   = "eu-central-1"
+environment  = "dev"
+cluster_name = "eks-blueprint"
+
+cluster_version = "1.30"
+vpc_cidr        = "10.0.0.0/16"
+az_count        = 3
+
+# Restrict the public API endpoint in production to your office/VPN CIDRs.
+cluster_endpoint_public_access_cidrs = ["0.0.0.0/0"]
+
+node_groups = {
+  core = {
+    instance_types = ["m6i.large"]
+    capacity_type  = "ON_DEMAND"
+    min_size       = 2
+    max_size       = 6
+    desired_size   = 3
+  }
+  spot = {
+    instance_types = ["m6i.large", "m6a.large", "m5.large"]
+    capacity_type  = "SPOT"
+    min_size       = 1
+    max_size       = 4
+    desired_size   = 2
+  }
+}

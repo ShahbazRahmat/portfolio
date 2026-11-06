@@ -1,0 +1,64 @@
+# Recording rules — SLI and error-budget burn rates.
+# Derived per the Google SRE Workbook multiwindow pattern.
+#
+# SLO assumption: 99.9% availability (see docs/slo-worksheet.md for the derivation).
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: slo-recording-rules
+  namespace: monitoring
+  labels:
+    release: kube-prometheus-stack
+spec:
+  groups:
+    # ── Service-level indicator: request availability ────────────────────────
+    - name: sli.http-availability
+      interval: 30s
+      rules:
+        - record: sli:http_availability:rate5m
+          expr: |
+            sum(rate(http_requests_total{code!~"5.."}[5m]))
+            /
+            sum(rate(http_requests_total[5m]))
+        - record: sli:http_availability:rate30m
+          expr: |
+            sum(rate(http_requests_total{code!~"5.."}[30m]))
+            /
+            sum(rate(http_requests_total[30m]))
+        - record: sli:http_availability:rate1h
+          expr: |
+            sum(rate(http_requests_total{code!~"5.."}[1h]))
+            /
+            sum(rate(http_requests_total[1h]))
+        - record: sli:http_availability:rate6h
+          expr: |
+            sum(rate(http_requests_total{code!~"5.."}[6h]))
+            /
+            sum(rate(http_requests_total[6h]))
+
+    # ── Error-budget burn rate (1.0 = consuming budget exactly on schedule) ──
+    - name: sli.error-budget
+      interval: 30s
+      rules:
+        - record: sli:error_budget_burn:rate5m
+          expr: (1 - sli:http_availability:rate5m) / (1 - 0.999)
+        - record: sli:error_budget_burn:rate30m
+          expr: (1 - sli:http_availability:rate30m) / (1 - 0.999)
+        - record: sli:error_budget_burn:rate1h
+          expr: (1 - sli:http_availability:rate1h) / (1 - 0.999)
+        - record: sli:error_budget_burn:rate6h
+          expr: (1 - sli:http_availability:rate6h) / (1 - 0.999)
+
+    # ── Golden signals, pre-aggregated for dashboards and alerts ─────────────
+    - name: golden.signals
+      interval: 30s
+      rules:
+        - record: golden:http_latency_p99:rate5m
+          expr: |
+            histogram_quantile(0.99,
+              sum(rate(http_request_duration_seconds_bucket[5m])) by (le))
+        - record: golden:http_error_ratio:rate5m
+          expr: |
+            sum(rate(http_requests_total{code=~"5.."}[5m]))
+            /
+            sum(rate(http_requests_total[5m]))

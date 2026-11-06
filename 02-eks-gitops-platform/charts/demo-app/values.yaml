@@ -1,0 +1,40 @@
+replicaCount: 4
+
+image:
+  repository: public.ecr.aws/nginx/nginx
+  tag: "1.27.2-alpine"   # immutable tags only — digest pinning on the roadmap
+  pullPolicy: IfNotPresent
+
+resources:
+  requests:
+    cpu: 100m
+    memory: 128Mi
+  limits:
+    memory: 256Mi
+
+# --- Canary strategy (Argo Rollouts) -----------------------------------------
+rollout:
+  steps:
+    - setWeight: 10
+    - pause: { duration: 2m }
+    - setWeight: 30
+    - analysis:
+        templates:
+          - templateName: demo-app-success-rate
+    - setWeight: 60
+    - pause: { duration: 2m }
+    - setWeight: 100
+
+analysis:
+  prometheusAddress: http://kube-prometheus-stack-prometheus.monitoring:9090
+  successRateThreshold: "0.99"
+  interval: 1m
+  count: 5
+  failureLimit: 1
+
+# --- Ingress ------------------------------------------------------------------
+ingress:
+  enabled: true
+  className: nginx
+  host: demo.example.com
+  path: /

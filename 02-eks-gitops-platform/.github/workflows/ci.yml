@@ -1,0 +1,44 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  helm-lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: azure/setup-helm@v4
+        with:
+          version: v3.15.4
+
+      - name: helm lint (all charts)
+        run: |
+          for chart in charts/*/; do
+            helm lint "$chart"
+          done
+
+      - name: helm template render check
+        run: |
+          for chart in charts/*/; do
+            helm template test "$chart" > /dev/null
+          done
+
+  manifest-validation:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: kubeconform (strict, k8s 1.30)
+        uses: docker://ghcr.io/yannh/kubeconform:v0.6.7
+        with:
+          entrypoint: /kubeconform
+          args: >-
+            -strict
+            -ignore-missing-schemas
+            -kubernetes-version 1.30.0
+            -summary
+            bootstrap/ projects/ applications/

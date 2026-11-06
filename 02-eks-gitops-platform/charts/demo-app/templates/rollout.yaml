@@ -1,0 +1,46 @@
+{{- if .Capabilities.APIVersions.Has "argoproj.io/v1alpha1" }}
+# Argo Rollouts CRD present → canary Rollout with analysis-gated steps.
+apiVersion: argoproj.io/v1alpha1
+kind: Rollout
+metadata:
+  name: {{ .Release.Name }}-demo-app
+  labels:
+    app: demo-app
+spec:
+  replicas: {{ .Values.replicaCount }}
+  revisionHistoryLimit: 3
+  selector:
+    matchLabels:
+      app: demo-app
+  template:
+    metadata:
+      labels:
+        app: demo-app
+    spec:
+{{ include "demo-app.podTemplate" . | indent 6 }}
+  strategy:
+    canary:
+      canaryService: {{ .Release.Name }}-demo-app-canary
+      stableService: {{ .Release.Name }}-demo-app-stable
+      steps:
+{{ toYaml .Values.rollout.steps | indent 8 }}
+{{- else }}
+# Rollouts CRD not detected (e.g. plain `helm template` in CI) → plain Deployment.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ .Release.Name }}-demo-app
+  labels:
+    app: demo-app
+spec:
+  replicas: {{ .Values.replicaCount }}
+  selector:
+    matchLabels:
+      app: demo-app
+  template:
+    metadata:
+      labels:
+        app: demo-app
+    spec:
+{{ include "demo-app.podTemplate" . | indent 6 }}
+{{- end }}

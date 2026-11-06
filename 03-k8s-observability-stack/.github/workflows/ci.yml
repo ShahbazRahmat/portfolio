@@ -1,0 +1,29 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  yaml-lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Validate all YAML parses
+        run: |
+          pip install --quiet yamllint
+          yamllint -d "{extends: default, rules: {line-length: disable, document-start: disable}}" \
+            values/ alerts/
+
+  promtool-check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Prometheus rule syntax check
+        run: |
+          docker run --rm -v "$PWD:/workspace" --workdir /workspace \
+            --entrypoint /bin/promtool prom/prometheus:latest \
+            check rules alerts/recording-rules.yaml alerts/alert-rules.yaml

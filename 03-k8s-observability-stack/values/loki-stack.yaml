@@ -1,0 +1,30 @@
+# Loki stack — log aggregation without the Elasticsearch memory bill.
+# Single binary mode is right for < ~100 GB/day; move to SimpleScalable beyond that.
+loki:
+  resources:
+    requests:
+      cpu: 200m
+      memory: 512Mi
+  config:
+    limits_config:
+      ingestion_rate_mb: 10
+      max_query_series: 500
+
+promtail:
+  resources:
+    requests:
+      cpu: 50m
+      memory: 64Mi
+  config:
+    # Drop noisy, low-value streams to keep costs flat:
+    snippets:
+      dropKubeAdminLogs: true
+      extraRelabelConfigs:
+        - action: labeldrop
+          regex: (container|pod_template_hash)
+
+grafana:
+  enabled: false   # grafana is provided by kube-prometheus-stack
+
+prometheus:
+  enabled: false   # scrape via the stack's serviceMonitor instead

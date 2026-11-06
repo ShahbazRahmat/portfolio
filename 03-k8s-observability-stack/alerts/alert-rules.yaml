@@ -1,0 +1,85 @@
+# Alert rules — burn-rate paging plus golden-signal tickets.
+#
+# Routing contract:
+#   * severity: page     → PagerDuty/on-call, interrupt whatever you are doing
+#   * severity: ticket   → Jira board, handled in working hours
+#
+# Every alert MUST carry a `runbook_url` — an alert without a runbook is noise.
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: slo-alert-rules
+  namespace: monitoring
+  labels:
+    release: kube-prometheus-stack
+spec:
+  groups:
+    # ── SLO burn-rate pages (Google SRE Workbook multiwindow pattern) ────────
+    - name: slo.pages
+      rules:
+        - alert: SLOBurnRateFast
+          expr: |
+            sli:error_budget_burn:rate1h > 14.4
+            and
+            sli:error_budget_burn:rate5m > 14.4
+          for: 5m
+          labels:
+            severity: page
+          annotations:
+            summary: "Availability SLO burning 14.4x — budget gone in ~2 days at this pace"
+            runbook_url: "https://github.com/shahbazkareem/k8s-observability-stack/blob/main/docs/runbook-high-5xx.md"
+
+        - alert: SLOBurnRateSustained
+          expr: |
+            sli:error_budget_burn:rate6h > 6
+            and
+            sli:error_budget_burn:rate30m > 6
+          for: 15m
+          labels:
+            severity: page
+          annotations:
+            summary: "Availability SLO burning 6x sustained — budget gone in ~7 days"
+            runbook_url: "https://github.com/shahbazkareem/k8s-observability-stack/blob/main/docs/runbook-high-5xx.md"
+
+    # ── Slow-burn tickets ─────────────────────────────────────────────────────
+    - name: slo.tickets
+      rules:
+        - alert: SLOBurnRateSlowLeak
+          expr: sli:error_budget_burn:rate6h > 1
+          for: 1h
+          labels:
+            severity: ticket
+          annotations:
+            summary: "Error budget burning above schedule — investigate before the sprint ends"
+            runbook_url: "https://github.com/shahbazkareem/k8s-observability-stack/blob/main/docs/runbook-high-5xx.md"
+
+    # ── Golden signals (ticket severity — pages come from SLO burns) ─────────
+    - name: golden.signals
+      rules:
+        - alert: High5xxErrorRate
+          expr: golden:http_error_ratio:rate5m > 0.01
+          for: 10m
+          labels:
+            severity: ticket
+          annotations:
+            summary: "5xx ratio above 1% for 10 minutes"
+            runbook_url: "https://github.com/shahbazkareem/k8s-observability-stack/blob/main/docs/runbook-high-5xx.md"
+
+        - alert: HighLatencyP99
+          expr: golden:http_latency_p99:rate5m > 1.0
+          for: 15m
+          labels:
+            severity: ticket
+          annotations:
+            summary: "p99 latency above 1s for 15 minutes"
+            runbook_url: "https://github.com/shahbazkareem/k8s-observability-stack/blob/main/docs/runbook-high-5xx.md"
+
+        - alert: PodCrashLooping
+          expr: |
+            increase(kube_pod_container_status_restarts_total{namespace!~"kube-system"}[1h]) > 5
+          for: 10m
+          labels:
+            severity: ticket
+          annotations:
+            summary: "Pod restarted more than 5 times in the last hour"
+            runbook_url: "https://github.com/shahbazkareem/k8s-observability-stack/blob/main/docs/runbook-high-5xx.md"
